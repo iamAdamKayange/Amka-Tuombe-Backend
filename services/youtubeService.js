@@ -27,15 +27,16 @@ async function getChannelVideos(maxResults = 30) {
             }
         });
 
-        const videos = playlistRes.data.items.map(item => ({
-            title: item.snippet.title,
-            description: item.snippet.description,
-            url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
-            thumbnail: item.snippet.thumbnails.high.url,
-            date: item.snippet.publishedAt.split('T')[0], // YYYY-MM-DD
-            duration: 'N/A', // YouTube API inahitaji call nyingine kwa duration, lakini tumia placeholder
-            videoId: item.snippet.resourceId.videoId
-        }));
+        // Hakikisha unarudisha thumbnail URL kamili, sio video ID
+const videos = playlistRes.data.items.map(item => ({
+  title: item.snippet.title,
+  description: item.snippet.description,
+  url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`,
+  thumbnail: item.snippet.thumbnails.high.url, // ✅ TAYARI NI URL KAMILI
+  date: item.snippet.publishedAt.split('T')[0],
+  duration: 'N/A',
+  videoId: item.snippet.resourceId.videoId
+}));
 
         return videos;
     } catch (error) {

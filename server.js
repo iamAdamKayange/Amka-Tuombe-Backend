@@ -32,6 +32,7 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/teachings', require('./routes/teachingRoutes'));
 app.use('/api/live', require('./routes/liveRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/audio', require('./routes/audioRoutes'));
 
 // Health check
 app.get('/', (req, res) => {
