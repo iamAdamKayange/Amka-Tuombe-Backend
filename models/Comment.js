@@ -13,7 +13,7 @@ class Comment {
     return rows[0];
   }
 
-  // 🔹 READ - Pata maoni kwa ID yake
+  // READ - Pata maoni kwa ID yake
   static async findById(id) {
     const query = `
       SELECT c.*, u.full_name as user_name
@@ -25,7 +25,7 @@ class Comment {
     return rows[0];
   }
 
-  // 🔹 READ - Pata maoni yote ya fundisho
+  // READ - Pata maoni yote ya fundisho
   static async findByTeachingId(teachingId) {
     const query = `
       SELECT c.*, u.full_name as user_name
@@ -38,7 +38,7 @@ class Comment {
     return rows;
   }
 
-  // 🔹 DELETE - Futa maoni (kwa mmiliki au admin)
+  // DELETE - Futa maoni (kwa mmiliki au admin)
   static async deleteById(id, userId, isAdmin = false) {
     let query, params;
     if (isAdmin) {
@@ -52,7 +52,7 @@ class Comment {
     return rowCount > 0;
   }
 
-  // 🔹 UPDATE - Badilisha maoni
+  // UPDATE - Badilisha maoni
   static async updateById(id, content) {
     const query = `
       UPDATE comments 
