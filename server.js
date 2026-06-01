@@ -34,7 +34,6 @@ pool.query('SELECT NOW()', (err, res) => {
 });
 
 // Routes
-// ... after middlewares
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/teachings', require('./routes/teachingRoutes'));   // public + user
 app.use('/api/admin', require('./routes/adminRoutes'));          // admin only
