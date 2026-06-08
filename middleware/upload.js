@@ -11,10 +11,18 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('video/')) cb(null, true);
-  else cb(new Error('Only video files are allowed'), false);
+  // Accept both video and audio
+  if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only video and audio files are allowed'), false);
+  }
 };
 
-const upload = multer({ storage, fileFilter, limits: { fileSize: 500 * 1024 * 1024 } });
+const upload = multer({ 
+  storage, 
+  fileFilter, 
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB
+});
 
 module.exports = upload;
