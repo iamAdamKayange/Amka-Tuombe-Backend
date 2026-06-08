@@ -1,20 +1,28 @@
 const express = require('express');
-const router = express.Router();
 const {
   getAllTeachings,
   getTeachingById,
   createTeaching,
   toggleLike,
-  addComment,
-  deleteComment
 } = require('../controllers/teachingController');
+const {
+  addComment,
+  deleteComment,
+  updateComment,      // ikiwa unahitaji
+  getCommentsByTeaching,
+} = require('../controllers/commentController');
 const auth = require('../middleware/auth');
+const router = express.Router();
 
 router.get('/', getAllTeachings);
 router.get('/:id', getTeachingById);
-router.post('/', auth, createTeaching);            // YouTube URL
+router.post('/', auth, createTeaching);
 router.post('/:id/like', auth, toggleLike);
-router.post('/:id/comments', auth, addComment);
+
+// Comments routes (sasa zinatoka kwenye commentController)
+router.get('/:teachingId/comments', getCommentsByTeaching);
+router.post('/:teachingId/comments', auth, addComment);
+router.put('/comments/:commentId', auth, updateComment);     // ikiwa unataka
 router.delete('/comments/:commentId', auth, deleteComment);
 
 module.exports = router;

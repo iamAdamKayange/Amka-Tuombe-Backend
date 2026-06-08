@@ -7,8 +7,7 @@ class LiveSession {
       VALUES ($1, $2, true, NOW())
       RETURNING *
     `;
-    const values = [title, streamUrl];
-    const { rows } = await pool.query(query, values);
+    const { rows } = await pool.query(query, [title, streamUrl]);
     return rows[0];
   }
 

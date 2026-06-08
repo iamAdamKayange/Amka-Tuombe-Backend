@@ -3,8 +3,7 @@ const pool = require('../config/db');
 class Like {
   static async create(teachingId, userId) {
     const query = 'INSERT INTO likes (teaching_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING *';
-    const values = [teachingId, userId];
-    const { rows } = await pool.query(query, values);
+    const { rows } = await pool.query(query, [teachingId, userId]);
     return rows[0];
   }
 

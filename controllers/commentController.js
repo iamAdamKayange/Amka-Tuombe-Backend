@@ -1,34 +1,34 @@
 const Comment = require('../models/Comment');
+const { invalidatePattern } = require('../utils/cache'); // Optional: for cache invalidation
 
 /**
  * @desc    Ongeza maoni kwenye fundisho
  * @route   POST /api/teachings/:teachingId/comments
- * @access  Private (Inahitaji authentication)
+ * @access  Private
  */
 exports.addComment = async (req, res) => {
   try {
     const { teachingId } = req.params;
     const { content } = req.body;
-    const userId = req.user.id; // Kutoka middleware ya auth
+    const userId = req.user.id;
 
-    // Validate input
     if (!content || content.trim() === '') {
       return res.status(400).json({ error: 'Maoni yanahitajika' });
     }
-
     if (content.length > 500) {
       return res.status(400).json({ error: 'Maoni hayawezi kuzidi herufi 500' });
     }
 
-    // Create comment
     const comment = await Comment.create({
       teachingId,
       userId,
-      content: content.trim()
+      content: content.trim(),
     });
 
-    // Get full comment with user details
     const fullComment = await Comment.findById(comment.id);
+
+    // Optional: Invalidate cache for this teaching's details
+    await invalidatePattern(`teaching:${teachingId}:*`);
 
     res.status(201).json(fullComment);
   } catch (err) {
@@ -38,14 +38,17 @@ exports.addComment = async (req, res) => {
 };
 
 /**
- * @desc    Pata maoni yote ya fundisho fulani
+ * @desc    Pata maoni yote ya fundisho (paged)
  * @route   GET /api/teachings/:teachingId/comments
  * @access  Public
  */
 exports.getCommentsByTeaching = async (req, res) => {
   try {
     const { teachingId } = req.params;
-    const comments = await Comment.findByTeachingId(teachingId);
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100); // Max 100 per page
+
+    const comments = await Comment.findByTeachingId(teachingId, page, limit);
     res.json(comments);
   } catch (err) {
     console.error('Error in getCommentsByTeaching:', err);
@@ -55,8 +58,8 @@ exports.getCommentsByTeaching = async (req, res) => {
 
 /**
  * @desc    Futa maoni (mmiliki au admin pekee)
- * @route   DELETE /api/teachings/comments/:commentId
- * @access  Private (Inahitaji authentication)
+ * @route   DELETE /api/comments/:commentId
+ * @access  Private
  */
 exports.deleteComment = async (req, res) => {
   try {
@@ -64,13 +67,11 @@ exports.deleteComment = async (req, res) => {
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    // First, get the comment to check ownership
     const comment = await Comment.findById(commentId);
     if (!comment) {
       return res.status(404).json({ error: 'Maoni haupatikani' });
     }
 
-    // Allow if user is comment owner OR admin
     if (comment.user_id !== userId && userRole !== 'admin') {
       return res.status(403).json({ error: 'Huna ruhusa ya kufuta maoni haya' });
     }
@@ -79,6 +80,9 @@ exports.deleteComment = async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Maoni haupatikani' });
     }
+
+    // Optional: Invalidate cache for the teaching's details
+    await invalidatePattern(`teaching:${comment.teaching_id}:*`);
 
     res.json({ message: 'Maoni yamefutwa kikamilifu' });
   } catch (err) {
@@ -89,7 +93,7 @@ exports.deleteComment = async (req, res) => {
 
 /**
  * @desc    Badilisha maoni (mmiliki pekee)
- * @route   PUT /api/teachings/comments/:commentId
+ * @route   PUT /api/comments/:commentId
  * @access  Private
  */
 exports.updateComment = async (req, res) => {
@@ -101,7 +105,6 @@ exports.updateComment = async (req, res) => {
     if (!content || content.trim() === '') {
       return res.status(400).json({ error: 'Maoni yanahitajika' });
     }
-
     if (content.length > 500) {
       return res.status(400).json({ error: 'Maoni hayawezi kuzidi herufi 500' });
     }
@@ -110,7 +113,6 @@ exports.updateComment = async (req, res) => {
     if (!comment) {
       return res.status(404).json({ error: 'Maoni haupatikani' });
     }
-
     if (comment.user_id !== userId) {
       return res.status(403).json({ error: 'Unaweza tu kubadilisha maoni yako mwenyewe' });
     }
@@ -121,6 +123,10 @@ exports.updateComment = async (req, res) => {
     }
 
     const updatedComment = await Comment.findById(commentId);
+
+    // Optional: Invalidate cache for the teaching's details
+    await invalidatePattern(`teaching:${comment.teaching_id}:*`);
+
     res.json(updatedComment);
   } catch (err) {
     console.error('Error in updateComment:', err);

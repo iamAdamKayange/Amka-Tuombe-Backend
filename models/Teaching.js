@@ -1,7 +1,6 @@
 const pool = require('../config/db');
 
 class Teaching {
-  // Kwa YouTube URL
   static async create({ title, description, url, thumbnail, duration, createdBy }) {
     const query = `
       INSERT INTO teachings (title, description, url, thumbnail, duration, created_by, status, created_at)
@@ -13,7 +12,6 @@ class Teaching {
     return rows[0];
   }
 
-  // Kwa file upload – ingiza kama 'processing'
   static async createPending({ title, description, createdBy }) {
     const query = `
       INSERT INTO teachings (title, description, status, created_by, created_at)
@@ -24,7 +22,6 @@ class Teaching {
     return rows[0];
   }
 
-  // Baada ya Cloudinary upload
   static async updateVideoDetails(id, videoUrl, duration, thumbnail) {
     await pool.query(
       `UPDATE teachings SET video_url = $1, duration = $2, thumbnail = $3, status = 'completed', updated_at = NOW() WHERE id = $4`,

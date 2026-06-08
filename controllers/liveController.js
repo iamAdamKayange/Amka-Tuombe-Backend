@@ -10,12 +10,9 @@ exports.getCurrentLive = async (req, res) => {
   }
 };
 
-// Admin only
 exports.startLive = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin only' });
-    }
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     const { title, streamUrl } = req.body;
     const session = await LiveSession.create({ title, streamUrl });
     res.status(201).json(session);
@@ -26,9 +23,7 @@ exports.startLive = async (req, res) => {
 
 exports.endLive = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin only' });
-    }
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     const active = await LiveSession.getActive();
     if (!active) return res.status(404).json({ error: 'No active live session' });
     const ended = await LiveSession.endSession(active.id);
