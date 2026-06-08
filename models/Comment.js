@@ -1,7 +1,6 @@
 const pool = require('../config/db');
 
 class Comment {
-  // CREATE - Ongeza maoni
   static async create({ teachingId, userId, content }) {
     const query = `
       INSERT INTO comments (teaching_id, user_id, content)
@@ -13,7 +12,6 @@ class Comment {
     return rows[0];
   }
 
-  // READ - Pata comment kwa ID pamoja na jina la mtumiaji
   static async findById(id) {
     const query = `
       SELECT c.*, u.full_name as user_name
@@ -25,7 +23,6 @@ class Comment {
     return rows[0];
   }
 
-  // READ - Pata comments zote za teaching fulani (pamoja na pagination)
   static async findByTeachingId(teachingId, page = 1, limit = 20) {
     const offset = (page - 1) * limit;
     const query = `
@@ -40,7 +37,6 @@ class Comment {
     return rows;
   }
 
-  // DELETE - Futa comment (mmiliki au admin)
   static async deleteById(id, userId, isAdmin = false) {
     let query, params;
     if (isAdmin) {
@@ -54,7 +50,6 @@ class Comment {
     return rowCount > 0;
   }
 
-  // UPDATE - Badilisha comment content
   static async updateById(id, content) {
     const query = `
       UPDATE comments 
