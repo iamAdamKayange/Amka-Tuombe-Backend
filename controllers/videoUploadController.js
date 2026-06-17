@@ -1,3 +1,4 @@
+// controllers/videoUploadController.js
 const { videoQueue } = require('../queues/videoQueue');
 const Teaching = require('../models/Teaching');
 
@@ -14,6 +15,10 @@ exports.uploadVideoFile = async (req, res) => {
   }
 
   const pending = await Teaching.createPending({ title, description, createdBy: req.user.id });
-  await videoQueue.add({ teachingId: pending.id, localPath: req.file.path });
+  await videoQueue.add({ 
+    teachingId: pending.id, 
+    localPath: req.file.path,
+    title: title,
+  });
   res.status(202).json({ message: 'Video upload accepted, processing in background', teachingId: pending.id });
 };

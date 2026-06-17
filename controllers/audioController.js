@@ -1,16 +1,8 @@
+// controllers/audioController.js
 const AudioSermon = require('../models/AudioSermon');
-const cloudinary = require('../config/cloudinary');
+const { uploadVideoFromPath } = require('../services/cloudflareService');
 const fs = require('fs').promises;
 const { validateAudio } = require('../middleware/validate');
-
-// Helper: upload to Cloudinary
-async function uploadToCloudinary(localPath) {
-  const result = await cloudinary.uploader.upload(localPath, {
-    resource_type: 'video', // 'video' also works for audio
-    folder: 'amka_tuombe_audio',
-  });
-  return result;
-}
 
 exports.getAllAudio = async (req, res) => {
   try {
@@ -37,52 +29,32 @@ exports.getAudioById = async (req, res) => {
   }
 };
 
-// This handles both file upload (multipart) and JSON (optional)
 exports.createAudio = async (req, res) => {
   try {
-    // Case 1: File upload (multipart)
-    if (req.file) {
-      // Validate required fields
-      if (!req.body.title) {
-        return res.status(400).json({ error: 'Title is required' });
-      }
-      if (!req.body.authorName) {
-        return res.status(400).json({ error: 'Author name is required' });
-      }
-
-      // Upload file to Cloudinary
-      let audioUrl, duration, thumbnail;
-      try {
-        const result = await uploadToCloudinary(req.file.path);
-        audioUrl = result.secure_url;
-        duration = Math.round(result.duration) || null;
-        thumbnail = result.thumbnail_url || null;
-        // Delete local file after upload
-        await fs.unlink(req.file.path).catch(() => {});
-      } catch (uploadErr) {
-        console.error('Cloudinary upload error:', uploadErr);
-        return res.status(500).json({ error: 'Failed to upload audio file' });
-      }
-
-      const audioData = {
-        title: req.body.title.trim(),
-        description: req.body.description ? req.body.description.trim() : '',
-        audioUrl: audioUrl,
-        duration: req.body.duration || (duration ? `${Math.floor(duration/60)}:${duration%60}` : null),
-        thumbnail: thumbnail || req.body.thumbnail || null,
-        createdBy: req.user.id,
-      };
-
-      const audio = await AudioSermon.create(audioData);
-      return res.status(201).json(audio);
-    } 
-    // Case 2: JSON body (if you keep the other endpoint)
-    else {
-      const { error } = validateAudio(req.body);
-      if (error) return res.status(400).json({ error: error.details[0].message });
-      const audio = await AudioSermon.create({ ...req.body, createdBy: req.user.id });
-      return res.status(201).json(audio);
+    if (!req.file) {
+      return res.status(400).json({ error: 'Audio file required' });
     }
+    if (!req.body.title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    // Upload to Cloudflare Stream
+    const result = await uploadVideoFromPath(req.file.path, req.body.title);
+
+    // Delete local file
+    await fs.unlink(req.file.path).catch(() => {});
+
+    const audioData = {
+      title: req.body.title.trim(),
+      description: req.body.description ? req.body.description.trim() : '',
+      audioUrl: result.videoUrl,
+      duration: req.body.duration || `${Math.floor(result.duration/60)}:${result.duration%60}`,
+      thumbnail: result.thumbnail || req.body.thumbnail || null,
+      createdBy: req.user.id,
+    };
+
+    const audio = await AudioSermon.create(audioData);
+    return res.status(201).json(audio);
   } catch (err) {
     console.error('Error in createAudio:', err);
     res.status(500).json({ error: err.message });
