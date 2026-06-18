@@ -18,8 +18,12 @@ app.use(helmet({
 }));
 
 // CORS - Bana kwa domain yako ya Flutter
+// app.use(cors({
+//   origin: ['https://your-flutter-domain.com', 'http://localhost:3000', 'http://localhost:5000'],
+//   credentials: true,
+// }));
 app.use(cors({
-  origin: ['https://your-flutter-domain.com', 'http://localhost:3000', 'http://localhost:5000'],
+  origin: true,
   credentials: true,
 }));
 
