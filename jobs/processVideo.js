@@ -1,16 +1,22 @@
-// Example Bull job for processing uploaded videos
-const Queue = require('bull');
-const videoQueue = new Queue('video processing', process.env.REDIS_URL);
+// jobs/videoProcessor.js
 
-videoQueue.process(async (job) => {
-  const { teachingId, videoUrl } = job.data;
-  console.log(`Processing video for teaching ${teachingId}: ${videoUrl}`);
-  // Add logic: extract duration, generate thumbnail, etc.
-  return { done: true };
-});
+const processVideo = async (teachingId, videoUrl) => {
+  console.log(
+    `Processing video for teaching ${teachingId}: ${videoUrl}`
+  );
 
-const addVideoJob = (teachingId, videoUrl) => {
-  return videoQueue.add({ teachingId, videoUrl });
+  // hapa unaweza kuongeza:
+  // thumbnail generation
+  // metadata extraction
+  // duration update
+
+  return {
+    done: true,
+    teachingId,
+    videoUrl,
+  };
 };
 
-module.exports = { addVideoJob };
+module.exports = {
+  processVideo,
+};

@@ -1,16 +1,19 @@
-const redis = require('../config/redis');
+// utils/cache.js
 
-const getOrSetCache = async (key, callback, ttl = 300) => {
-  const cached = await redis.get(key);
-  if (cached) return JSON.parse(cached);
-  const fresh = await callback();
-  await redis.setex(key, ttl, JSON.stringify(fresh));
-  return fresh;
+const getOrSetCache = async (key, callback) => {
+  return await callback();
 };
 
-const invalidatePattern = async (pattern) => {
-  const keys = await redis.keys(pattern);
-  if (keys.length) await redis.del(keys);
+const getCachedOrFetch = async (key, callback) => {
+  return await callback();
 };
 
-module.exports = { getOrSetCache, invalidatePattern };
+const invalidatePattern = async () => {
+  return true;
+};
+
+module.exports = {
+  getOrSetCache,
+  getCachedOrFetch,
+  invalidatePattern,
+};
