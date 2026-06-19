@@ -1,11 +1,9 @@
 // controllers/videoUploadController.js
 const Teaching = require('../models/Teaching');
-const { uploadVideoFromPath } = require('../services/cloudflareService');
-const fs = require('fs').promises;
+const { uploadVideo } = require('../services/cloudinaryService');
 
 exports.uploadVideoFile = async (req, res) => {
   try {
-    // ✅ LOGGING - Angalia user
     console.log('========================================');
     console.log('📤 UPLOAD VIDEO FILE CALLED');
     console.log('👤 req.user:', req.user);
@@ -13,7 +11,6 @@ exports.uploadVideoFile = async (req, res) => {
     console.log('👤 req.user.id:', req.user?.id);
     console.log('========================================');
 
-    // ✅ Check if user exists first
     if (!req.user) {
       console.log('❌ No user object found');
       return res.status(401).json({
@@ -47,46 +44,36 @@ exports.uploadVideoFile = async (req, res) => {
       });
     }
 
-    // Save pending teaching
-    const teaching = await Teaching.createPending({
-      title: title.trim(),
-      description: description.trim(),
-      createdBy: req.user.id,
-    });
-    console.log('✅ Teaching created with ID:', teaching.id);
+    // ✅ Direct upload to Cloudinary (NO QUEUE)
+    console.log('📤 Uploading video to Cloudinary directly...');
 
-    console.log('📤 Uploading video to Cloudflare Stream...');
-
-    const result = await uploadVideoFromPath(
+    const result = await uploadVideo(
       req.file.path,
       title.trim(),
+      'amka_tuombe_videos'
     );
 
-    console.log('✅ Cloudflare upload successful');
-    console.log('📥 Video URL:', result.videoUrl);
+    console.log('✅ Cloudinary upload successful');
+    console.log('📥 Video URL:', result.url);
     console.log('📥 Thumbnail:', result.thumbnail);
+    console.log('📥 Duration:', result.duration);
 
-    // Delete local uploaded file
-    await fs.unlink(req.file.path).catch(() => {
-      console.log('⚠️ Could not delete local file');
-    });
-
-    // Update teaching after upload success
-    await Teaching.markCompleted(
-      teaching.id,
-      result.videoUrl,
-      result.thumbnail,
-      result.duration,
-    );
-    console.log('✅ Teaching marked as completed');
-
-    return res.status(200).json({
-      success: true,
-      message: 'Video uploaded successfully',
-      teachingId: teaching.id,
-      videoUrl: result.videoUrl,
+    // ✅ Create teaching directly (NO PENDING)
+    const teaching = await Teaching.create({
+      title: title.trim(),
+      description: description.trim(),
+      url: result.url,
       thumbnail: result.thumbnail,
       duration: result.duration,
+      createdBy: req.user.id,
+    });
+
+    console.log('✅ Teaching created with ID:', teaching.id);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Video uploaded successfully',
+      teaching: teaching,
     });
   } catch (err) {
     console.error('❌ VIDEO UPLOAD ERROR:', err);
