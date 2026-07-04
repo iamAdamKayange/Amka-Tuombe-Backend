@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const pool = require('./config/db');
+const migrate = require('./db/migrate');
 const { apiLimiter } = require('./middleware/rateLimiter');
 
 const app = express();
@@ -92,12 +93,27 @@ app.use((err, req, res, next) => {
   return res.status(status).json({ error: message });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+let server;
+
+async function start() {
+  await migrate();
+  server = app.listen(PORT, () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
+}
+
+start().catch(async (error) => {
+  console.error('Server startup failed:', error);
+  await pool.end().catch(() => {});
+  process.exit(1);
 });
 
 async function shutdown(signal) {
   console.log(`${signal} received, shutting down gracefully`);
+  if (!server) {
+    await pool.end();
+    process.exit(0);
+  }
   server.close(async () => {
     await pool.end();
     process.exit(0);

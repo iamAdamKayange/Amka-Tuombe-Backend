@@ -12,11 +12,12 @@ const {
   getCommentsByTeaching,
 } = require('../controllers/commentController');
 const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
 const router = express.Router();
 
 router.get('/', getAllTeachings);
 router.get('/:id', getTeachingById);
-router.post('/', auth, createTeaching);
+router.post('/', auth, admin, createTeaching);
 router.post('/:id/like', auth, toggleLike);
 
 // Comments routes (sasa zinatoka kwenye commentController)
