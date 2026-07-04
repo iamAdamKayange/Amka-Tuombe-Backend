@@ -66,7 +66,7 @@ class Teaching {
   }
 
   static async decrementLikes(id) {
-    await pool.query('UPDATE teachings SET likes_count = likes_count - 1 WHERE id = $1', [id]);
+    await pool.query('UPDATE teachings SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1', [id]);
   }
 }
 

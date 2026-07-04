@@ -5,8 +5,9 @@ const { validateTeaching } = require('../middleware/validate');
 
 exports.getAllTeachings = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const requestedLimit = parseInt(req.query.limit, 10) || 20;
+    const limit = Math.min(Math.max(requestedLimit, 1), 50);
 
     const offset = (page - 1) * limit;
 
