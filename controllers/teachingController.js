@@ -4,6 +4,7 @@ const Like = require('../models/Like');
 const Notification = require('../models/Notification');
 const { validateTeaching } = require('../middleware/validate');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
+const { deleteObject, extractR2Key } = require('../services/r2Service');
 const { emitMediaChanged } = require('../services/realtimeService');
 
 exports.getAllTeachings = async (req, res) => {
@@ -224,9 +225,15 @@ exports.deleteTeaching = async (req, res) => {
     const teaching = await Teaching.deleteById(req.params.id);
     if (!teaching) return res.status(404).json({ error: 'Teaching not found' });
 
-    const publicId = teaching.cloudinary_public_id ||
-      extractCloudinaryPublicId(teaching.url || teaching.video_url);
-    if (publicId) await deleteFile(publicId);
+    const r2Key = extractR2Key(teaching.cloudinary_public_id) ||
+      extractR2Key(teaching.url || teaching.video_url);
+    if (r2Key) {
+      await deleteObject(r2Key);
+    } else {
+      const publicId = teaching.cloudinary_public_id ||
+        extractCloudinaryPublicId(teaching.url || teaching.video_url);
+      if (publicId) await deleteFile(publicId);
+    }
 
     emitMediaChanged('deleted', 'video', { id: teaching.id });
     return res.json({ message: 'Video deleted', id: teaching.id });

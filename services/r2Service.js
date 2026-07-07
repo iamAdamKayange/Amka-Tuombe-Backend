@@ -1,12 +1,35 @@
 const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
+const crypto = require('crypto');
 const {
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
 } = require('@aws-sdk/client-s3');
 const s3 = require('../config/r2');
+
+function hmac(key, value, encoding) {
+  return crypto.createHmac('sha256', key).update(value).digest(encoding);
+}
+
+function sha256(value, encoding = 'hex') {
+  return crypto.createHash('sha256').update(value).digest(encoding);
+}
+
+function amzDateParts(date = new Date()) {
+  const iso = date.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  return {
+    amzDate: iso,
+    dateStamp: iso.slice(0, 8),
+  };
+}
+
+function encodePathPart(value) {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
 
 function safeKeyPart(value) {
   return (value || 'upload')
@@ -27,6 +50,73 @@ function publicUrlForKey(key) {
   const endpoint = (process.env.R2_ENDPOINT || '').replace(/\/+$/, '');
   const bucket = process.env.R2_BUCKET;
   return `${endpoint}/${bucket}/${encodeURI(key)}`;
+}
+
+function presignPutObject({ key, expiresIn = 3600 }) {
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  const endpoint = process.env.R2_ENDPOINT;
+  const bucket = process.env.R2_BUCKET;
+
+  if (!accessKeyId || !secretAccessKey || !endpoint || !bucket) {
+    throw new Error('R2 env hazijakamilika.');
+  }
+
+  const url = new URL(endpoint);
+  const host = url.host;
+  const region = 'auto';
+  const service = 's3';
+  const { amzDate, dateStamp } = amzDateParts();
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const canonicalUri = `/${encodePathPart(bucket)}/${key
+    .split('/')
+    .map(encodePathPart)
+    .join('/')}`;
+
+  const query = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Content-Sha256': 'UNSIGNED-PAYLOAD',
+    'X-Amz-Credential': `${accessKeyId}/${credentialScope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(expiresIn),
+    'X-Amz-SignedHeaders': 'host',
+  };
+  const canonicalQuery = Object.keys(query)
+    .sort()
+    .map((name) => `${encodeURIComponent(name)}=${encodeURIComponent(query[name])}`)
+    .join('&');
+  const canonicalRequest = [
+    'PUT',
+    canonicalUri,
+    canonicalQuery,
+    `host:${host}\n`,
+    'host',
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    sha256(canonicalRequest),
+  ].join('\n');
+  const dateKey = hmac(`AWS4${secretAccessKey}`, dateStamp);
+  const regionKey = hmac(dateKey, region);
+  const serviceKey = hmac(regionKey, service);
+  const signingKey = hmac(serviceKey, 'aws4_request');
+  const signature = hmac(signingKey, stringToSign, 'hex');
+
+  return `${url.origin}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+function createDirectUpload({ folder, title, originalName, fallbackExtension = '.bin', expiresIn }) {
+  const extension = path.extname(originalName || '') || fallbackExtension;
+  const key = `${folder}/${Date.now()}_${safeKeyPart(title)}${extension}`;
+
+  return {
+    key,
+    uploadUrl: presignPutObject({ key, expiresIn }),
+    expiresIn: expiresIn || Number(process.env.CF_UPLOAD_EXPIRY || 3600),
+  };
 }
 
 async function removeLocalFile(localPath) {
@@ -116,16 +206,27 @@ function extractR2Key(url) {
     if (bucket && pathname.startsWith(`${bucket}/`)) {
       return decodeURIComponent(pathname.slice(bucket.length + 1));
     }
-    if (pathname.startsWith('audio/')) return decodeURIComponent(pathname);
+    if (
+      pathname.startsWith('audio/') ||
+      pathname.startsWith('videos/') ||
+      pathname.startsWith('images/')
+    ) {
+      return decodeURIComponent(pathname);
+    }
     return null;
   } catch (_) {
-    return url.startsWith('audio/') ? url : null;
+    return url.startsWith('audio/') ||
+      url.startsWith('videos/') ||
+      url.startsWith('images/')
+      ? url
+      : null;
   }
 }
 
 module.exports = {
   uploadAudio,
   uploadImage,
+  createDirectUpload,
   getObjectStream,
   deleteObject,
   extractR2Key,

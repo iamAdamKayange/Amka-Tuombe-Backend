@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { uploadImage } = require('../services/r2Service');
+const { createDirectUpload, uploadImage } = require('../services/r2Service');
 
 function cleanTitle(value) {
   return (value || 'amka_tuombe_upload')
@@ -59,6 +59,40 @@ async function createCloudflareStreamUpload({ title, fileSize }) {
   };
 }
 
+function isStreamQuotaError(err) {
+  const status = err.response?.status;
+  const message =
+    err.response?.data?.errors?.[0]?.message ||
+    err.response?.data?.message ||
+    err.response?.data?.error ||
+    '';
+
+  return status === 413 &&
+    /storage capacity exceeded|storage quota|purchase more minutes/i.test(message);
+}
+
+function createR2VideoUpload({ req, title }) {
+  const upload = createDirectUpload({
+    folder: 'videos',
+    title,
+    originalName: req.query.fileName,
+    fallbackExtension: '.mp4',
+    expiresIn: Number(process.env.CF_UPLOAD_EXPIRY || 3600),
+  });
+  const playbackUrl = `${req.protocol}://${req.get('host')}/api/media/r2/${encodeURI(upload.key)}`;
+
+  return {
+    provider: 'cloudflare_r2',
+    uploadProtocol: 'put',
+    uploadUrl: upload.uploadUrl,
+    key: upload.key,
+    playbackUrl,
+    thumbnailUrl: '',
+    expiresIn: upload.expiresIn,
+    fallbackReason: 'cloudflare_stream_quota',
+  };
+}
+
 exports.getUploadSignature = async (req, res) => {
   try {
     const supportedTypes = new Set(['video', 'audio', 'image']);
@@ -66,11 +100,19 @@ exports.getUploadSignature = async (req, res) => {
     const title = cleanTitle(req.query.title);
 
     if (type === 'video') {
-      const upload = await createCloudflareStreamUpload({
-        title,
-        fileSize: req.query.fileSize,
-      });
-      return res.json(upload);
+      try {
+        const upload = await createCloudflareStreamUpload({
+          title,
+          fileSize: req.query.fileSize,
+        });
+        return res.json(upload);
+      } catch (err) {
+        if (isStreamQuotaError(err)) {
+          console.warn('Cloudflare Stream quota exceeded. Falling back to R2 video upload.');
+          return res.json(createR2VideoUpload({ req, title }));
+        }
+        throw err;
+      }
     }
 
     if (type === 'audio') {
@@ -92,9 +134,16 @@ exports.getUploadSignature = async (req, res) => {
       err.response?.data?.errors?.[0]?.message ||
       err.response?.data?.message ||
       err.response?.data?.error;
-    const message = status === 413
-      ? `Cloudflare Stream imekataa ukubwa wa video hii. Angalia Stream account limit au mpunguze/compress video. ${cloudflareError || ''}`.trim()
-      : cloudflareError || err.message;
+    const quotaExceeded =
+      status === 413 &&
+      /storage capacity exceeded|storage quota|purchase more minutes/i.test(
+        cloudflareError || '',
+      );
+    const message = quotaExceeded
+      ? 'Cloudflare Stream storage quota imejaa. Futa videos kwenye Cloudflare Stream dashboard au nunua/ongeza minutes ili uendelee ku-upload.'
+      : status === 413
+        ? `Cloudflare Stream imekataa video hii. Angalia Stream account limits. ${cloudflareError || ''}`.trim()
+        : cloudflareError || err.message;
 
     console.error('Upload signature error:', {
       status,
