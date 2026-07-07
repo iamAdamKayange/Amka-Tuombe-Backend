@@ -1,21 +1,8 @@
-// controllers/audioController.js
 const AudioSermon = require('../models/AudioSermon');
 const Notification = require('../models/Notification');
-const { uploadAudio } = require('../services/cloudinaryService');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
+const { uploadAudio, deleteObject, extractR2Key } = require('../services/r2Service');
 const { emitMediaChanged } = require('../services/realtimeService');
-
-function formatDuration(totalSeconds) {
-  const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainder = seconds % 60;
-  const twoDigits = (value) => value.toString().padStart(2, '0');
-
-  return hours > 0
-    ? `${hours}:${twoDigits(minutes)}:${twoDigits(remainder)}`
-    : `${twoDigits(minutes)}:${twoDigits(remainder)}`;
-}
 
 exports.getAllAudio = async (req, res) => {
   try {
@@ -56,28 +43,24 @@ exports.createAudio = async (req, res) => {
       return res.status(400).json({ error: 'Author name is required' });
     }
 
-    console.log('🎵 Uploading audio to Cloudinary directly...');
+    console.log('Uploading audio to Cloudflare R2...');
 
-    // ✅ Direct upload to Cloudinary (NO QUEUE)
-    const result = await uploadAudio(
-      req.file.path,
-      req.body.title.trim(),
-      'amka_tuombe_audio'
-    );
+    const result = await uploadAudio(req.file.path, {
+      title: req.body.title.trim(),
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    const audioUrl =
+      `${req.protocol}://${req.get('host')}/api/media/r2/${encodeURI(result.key)}`;
 
-    console.log('✅ Audio upload successful');
-    console.log('📥 Audio URL:', result.url);
-    console.log('📥 Duration:', result.duration);
-
-    // ✅ Create audio directly (NO PENDING)
     const audioData = {
       title: req.body.title.trim(),
       description: req.body.description ? req.body.description.trim() : '',
-      audioUrl: result.url,
-      duration: formatDuration(result.duration),
+      audioUrl,
+      duration: req.body.duration || '',
       thumbnail: req.body.thumbnail || null,
       createdBy: req.user.id,
-      cloudinaryPublicId: result.public_id,
+      cloudinaryPublicId: result.key,
     };
 
     const audio = await AudioSermon.create(audioData);
@@ -131,8 +114,14 @@ exports.deleteAudio = async (req, res) => {
     const audio = await AudioSermon.deleteById(req.params.id);
     if (!audio) return res.status(404).json({ error: 'Audio not found' });
 
-    const publicId = audio.cloudinary_public_id || extractCloudinaryPublicId(audio.audio_url);
-    if (publicId) await deleteFile(publicId);
+    const r2Key = extractR2Key(audio.cloudinary_public_id) || extractR2Key(audio.audio_url);
+    if (r2Key) {
+      await deleteObject(r2Key);
+    } else {
+      const publicId = audio.cloudinary_public_id || extractCloudinaryPublicId(audio.audio_url);
+      if (publicId) await deleteFile(publicId);
+    }
+
     const coverPublicId = extractCloudinaryPublicId(audio.thumbnail);
     if (coverPublicId) await deleteFile(coverPublicId, 'image');
 

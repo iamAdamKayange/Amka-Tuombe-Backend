@@ -1,64 +1,119 @@
-const cloudinary = require('../config/cloudinary');
+const axios = require('axios');
+const { uploadImage } = require('../services/r2Service');
+
+function cleanTitle(value) {
+  return (value || 'amka_tuombe_upload')
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80);
+}
+
+async function createCloudflareStreamUpload({ title, fileSize }) {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+
+  if (!accountId || !apiToken) {
+    throw new Error('Cloudflare Stream env hazijakamilika.');
+  }
+
+  const uploadLength = Number(fileSize);
+  if (!Number.isFinite(uploadLength) || uploadLength <= 0) {
+    throw new Error('Ukubwa wa video haujatumwa vizuri.');
+  }
+
+  const uploadName = Buffer.from(title || 'amka_tuombe_video').toString('base64');
+  const response = await axios.post(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream?direct_user=true`,
+    null,
+    {
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Tus-Resumable': '1.0.0',
+        'Upload-Length': uploadLength,
+        'Upload-Metadata': `name ${uploadName}`,
+      },
+      maxBodyLength: Infinity,
+      validateStatus: (status) => status >= 200 && status < 300,
+    },
+  );
+
+  const uploadUrl = response.headers.location;
+  const uid = response.headers['stream-media-id'] ||
+    response.headers['stream-media-uid'];
+
+  if (!uploadUrl || !uid) {
+    throw new Error('Cloudflare haijarudisha upload URL au video ID.');
+  }
+
+  return {
+    provider: 'cloudflare_stream',
+    uploadProtocol: 'tus',
+    uploadUrl,
+    uid,
+    playbackUrl: `https://videodelivery.net/${uid}/manifest/video.m3u8`,
+    thumbnailUrl: `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg?time=2s`,
+    expiresIn: Number(process.env.CF_UPLOAD_EXPIRY || 3600),
+  };
+}
 
 exports.getUploadSignature = async (req, res) => {
   try {
     const supportedTypes = new Set(['video', 'audio', 'image']);
     const type = supportedTypes.has(req.query.type) ? req.query.type : 'video';
-    const title = (req.query.title || 'amka_tuombe_upload')
-      .toString()
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .slice(0, 80);
+    const title = cleanTitle(req.query.title);
 
-    const timestamp = Math.round(Date.now() / 1000);
-    const folder = type === 'audio'
-      ? 'amka_tuombe_audio'
-      : type === 'image'
-        ? 'amka_tuombe_audio_covers'
-        : 'amka_tuombe_videos';
-    const publicId = `${Date.now()}_${title || type}`;
+    if (type === 'video') {
+      const upload = await createCloudflareStreamUpload({
+        title,
+        fileSize: req.query.fileSize,
+      });
+      return res.json(upload);
+    }
 
-    const videoTransformations = {
-      original: 'c_limit,w_1920,h_1080,q_auto:good',
-      landscape: 'c_fill,g_auto,w_1280,h_720,q_auto:good',
-      portrait: 'c_fill,g_auto,w_720,h_1280,q_auto:good',
-      square: 'c_fill,g_auto,w_1080,h_1080,q_auto:good',
-      four_five: 'c_fill,g_auto,w_1080,h_1350,q_auto:good',
-    };
-    const cropPreset = Object.hasOwn(videoTransformations, req.query.crop)
-      ? req.query.crop
-      : 'original';
-    const transformation = type === 'video'
-      ? videoTransformations[cropPreset]
-      : undefined;
+    if (type === 'audio') {
+      return res.json({
+        provider: 'cloudflare_r2',
+        uploadMode: 'backend_multipart',
+        uploadUrl: `${req.protocol}://${req.get('host')}/api/audio/upload`,
+      });
+    }
 
-    const params = {
-      timestamp,
-      folder,
-      public_id: publicId,
-      ...(transformation ? { transformation } : {}),
-    };
-
-    const signature = cloudinary.utils.api_sign_request(
-      params,
-      process.env.CLOUDINARY_API_SECRET,
-    );
-
-    res.json({
-      signature,
-      timestamp,
-      folder,
-      publicId,
-      cropPreset,
-      transformation,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
-      uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/${type === 'image' ? 'image' : 'video'}/upload`,
+    return res.json({
+      provider: 'cloudflare_r2',
+      uploadMode: 'backend_multipart',
+      uploadUrl: `${req.protocol}://${req.get('host')}/api/upload/image`,
     });
   } catch (err) {
-    console.error('Cloudinary signature error:', err);
+    console.error('Upload signature error:', err);
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.uploadImage = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Image file required' });
+    }
+
+    const result = await uploadImage(req.file.path, {
+      title: req.body.title || 'cover',
+      originalName: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
+    const url = `${req.protocol}://${req.get('host')}/api/media/r2/${encodeURI(result.key)}`;
+
+    return res.status(201).json({
+      provider: 'cloudflare_r2',
+      secure_url: url,
+      url,
+      key: result.key,
+      bytes: result.bytes,
+    });
+  } catch (error) {
+    console.error('R2 image upload error:', error);
+    return res.status(500).json({ error: error.message });
   }
 };

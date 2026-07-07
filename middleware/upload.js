@@ -11,11 +11,14 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // Accept both video and audio
-  if (file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/')) {
+  if (
+    file.mimetype.startsWith('video/') ||
+    file.mimetype.startsWith('audio/') ||
+    file.mimetype.startsWith('image/')
+  ) {
     cb(null, true);
   } else {
-    cb(new Error('Only video and audio files are allowed'), false);
+    cb(new Error('Only video, audio, and image files are allowed'), false);
   }
 };
 
