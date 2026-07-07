@@ -87,8 +87,21 @@ exports.getUploadSignature = async (req, res) => {
       uploadUrl: `${req.protocol}://${req.get('host')}/api/upload/image`,
     });
   } catch (err) {
-    console.error('Upload signature error:', err);
-    res.status(500).json({ error: err.message });
+    const status = err.response?.status || 500;
+    const cloudflareError =
+      err.response?.data?.errors?.[0]?.message ||
+      err.response?.data?.message ||
+      err.response?.data?.error;
+    const message = status === 413
+      ? `Cloudflare Stream imekataa ukubwa wa video hii. Angalia Stream account limit au mpunguze/compress video. ${cloudflareError || ''}`.trim()
+      : cloudflareError || err.message;
+
+    console.error('Upload signature error:', {
+      status,
+      message,
+      cloudflare: err.response?.data,
+    });
+    res.status(status >= 400 && status < 600 ? status : 500).json({ error: message });
   }
 };
 
