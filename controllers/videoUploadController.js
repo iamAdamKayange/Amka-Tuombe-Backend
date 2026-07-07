@@ -1,6 +1,7 @@
 // controllers/videoUploadController.js
 const Teaching = require('../models/Teaching');
 const { uploadVideo } = require('../services/cloudinaryService');
+const { emitMediaChanged } = require('../services/realtimeService');
 
 exports.uploadVideoFile = async (req, res) => {
   try {
@@ -69,6 +70,8 @@ exports.uploadVideoFile = async (req, res) => {
     });
 
     console.log('✅ Teaching created with ID:', teaching.id);
+
+    emitMediaChanged('created', 'video', teaching);
 
     return res.status(201).json({
       success: true,

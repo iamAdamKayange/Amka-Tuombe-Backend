@@ -3,6 +3,7 @@ const AudioSermon = require('../models/AudioSermon');
 const Notification = require('../models/Notification');
 const { uploadAudio } = require('../services/cloudinaryService');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
+const { emitMediaChanged } = require('../services/realtimeService');
 
 function formatDuration(totalSeconds) {
   const seconds = Math.max(0, Math.round(Number(totalSeconds) || 0));
@@ -89,6 +90,7 @@ exports.createAudio = async (req, res) => {
       dedupeKey: `audio:${audio.id}`,
     }).catch((error) => console.error('Create audio notification error:', error.message));
 
+    emitMediaChanged('created', 'audio', audio);
     return res.status(201).json(audio);
   } catch (err) {
     console.error('Error in createAudio:', err);
@@ -116,6 +118,7 @@ exports.updateAudio = async (req, res) => {
       thumbnail: req.body.thumbnail ?? current.thumbnail,
       duration: req.body.duration ?? current.duration,
     });
+    emitMediaChanged('updated', 'audio', audio);
     return res.json(audio);
   } catch (err) {
     console.error('Update audio error:', err);
@@ -133,6 +136,7 @@ exports.deleteAudio = async (req, res) => {
     const coverPublicId = extractCloudinaryPublicId(audio.thumbnail);
     if (coverPublicId) await deleteFile(coverPublicId, 'image');
 
+    emitMediaChanged('deleted', 'audio', { id: audio.id });
     return res.json({ message: 'Audio deleted', id: audio.id });
   } catch (err) {
     console.error('Delete audio error:', err);

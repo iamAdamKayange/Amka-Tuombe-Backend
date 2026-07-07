@@ -1,11 +1,14 @@
 require('dotenv').config();
 
 const express = require('express');
+const http = require('http');
 const cors = require('cors');
 const helmet = require('helmet');
+const { Server } = require('socket.io');
 const pool = require('./config/db');
 const migrate = require('./db/migrate');
 const { apiLimiter } = require('./middleware/rateLimiter');
+const { initRealtime } = require('./services/realtimeService');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
@@ -15,6 +18,18 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const corsOrigin = (origin, callback) => {
+  if (!origin || !isProduction || allowedOrigins.length === 0) {
+    return callback(null, true);
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error('Origin not allowed by CORS'));
+};
 
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -28,17 +43,7 @@ app.use(
 
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin || !isProduction || allowedOrigins.length === 0) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error('Origin not allowed by CORS'));
-    },
+    origin: corsOrigin,
     credentials: true,
   }),
 );
@@ -98,7 +103,17 @@ let server;
 
 async function start() {
   await migrate();
-  server = app.listen(PORT, () => {
+  server = http.createServer(app);
+
+  const io = new Server(server, {
+    cors: {
+      origin: corsOrigin,
+      credentials: true,
+    },
+  });
+  initRealtime(io);
+
+  server.listen(PORT, () => {
     console.log(`Server listening on http://localhost:${PORT}`);
   });
 }

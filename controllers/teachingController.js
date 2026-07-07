@@ -4,6 +4,7 @@ const Like = require('../models/Like');
 const Notification = require('../models/Notification');
 const { validateTeaching } = require('../middleware/validate');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
+const { emitMediaChanged } = require('../services/realtimeService');
 
 exports.getAllTeachings = async (req, res) => {
   try {
@@ -72,6 +73,7 @@ exports.createTeaching = async (req, res) => {
       dedupeKey: `video:${teaching.id}`,
     }).catch((error) => console.error('Create video notification error:', error.message));
 
+    emitMediaChanged('created', 'video', teaching);
     res.status(201).json(teaching);
   } catch (err) {
     console.error('❌ createTeaching error:', err);
@@ -209,6 +211,7 @@ exports.updateTeaching = async (req, res) => {
       thumbnail: req.body.thumbnail ?? current.thumbnail,
       duration: req.body.duration ?? current.duration,
     });
+    emitMediaChanged('updated', 'video', teaching);
     return res.json(teaching);
   } catch (err) {
     console.error('Update teaching error:', err);
@@ -225,6 +228,7 @@ exports.deleteTeaching = async (req, res) => {
       extractCloudinaryPublicId(teaching.url || teaching.video_url);
     if (publicId) await deleteFile(publicId);
 
+    emitMediaChanged('deleted', 'video', { id: teaching.id });
     return res.json({ message: 'Video deleted', id: teaching.id });
   } catch (err) {
     console.error('Delete teaching error:', err);
