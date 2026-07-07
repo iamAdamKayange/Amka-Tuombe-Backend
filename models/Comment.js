@@ -5,7 +5,7 @@ class Comment {
     const query = `
       INSERT INTO comments (teaching_id, user_id, content)
       VALUES ($1, $2, $3)
-      RETURNING id, teaching_id, user_id, content, created_at
+      RETURNING id, teaching_id, user_id, content, created_at, updated_at
     `;
     const values = [teachingId, userId, content];
     const { rows } = await pool.query(query, values);
@@ -14,7 +14,7 @@ class Comment {
 
   static async findById(id) {
     const query = `
-      SELECT c.*, u.full_name as user_name
+      SELECT c.*, u.full_name as user_name, u.role as user_role
       FROM comments c
       JOIN users u ON c.user_id = u.id
       WHERE c.id = $1
@@ -27,6 +27,7 @@ class Comment {
     const offset = (page - 1) * limit;
     const query = `
       SELECT c.*, u.full_name as user_name
+        , u.role as user_role
       FROM comments c
       JOIN users u ON c.user_id = u.id
       WHERE c.teaching_id = $1

@@ -70,6 +70,7 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/live', require('./routes/liveRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/audio', require('./routes/audioRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

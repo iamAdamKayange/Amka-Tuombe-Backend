@@ -1,6 +1,7 @@
 const Teaching = require('../models/Teaching');
 const Comment = require('../models/Comment');
 const Like = require('../models/Like');
+const Notification = require('../models/Notification');
 const { validateTeaching } = require('../middleware/validate');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
 
@@ -61,6 +62,15 @@ exports.createTeaching = async (req, res) => {
       ...req.body,
       createdBy: req.user.id,
     });
+
+    await Notification.create({
+      type: 'video',
+      title: 'Video mpya imewekwa',
+      body: teaching.title,
+      url: teaching.url || teaching.video_url || null,
+      mediaId: teaching.id,
+      dedupeKey: `video:${teaching.id}`,
+    }).catch((error) => console.error('Create video notification error:', error.message));
 
     res.status(201).json(teaching);
   } catch (err) {

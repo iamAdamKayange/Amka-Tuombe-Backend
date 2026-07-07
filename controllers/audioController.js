@@ -1,5 +1,6 @@
 // controllers/audioController.js
 const AudioSermon = require('../models/AudioSermon');
+const Notification = require('../models/Notification');
 const { uploadAudio } = require('../services/cloudinaryService');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
 
@@ -79,6 +80,15 @@ exports.createAudio = async (req, res) => {
     };
 
     const audio = await AudioSermon.create(audioData);
+    await Notification.create({
+      type: 'audio',
+      title: 'Audio mpya imewekwa',
+      body: audio.title,
+      url: audio.audio_url,
+      mediaId: audio.id,
+      dedupeKey: `audio:${audio.id}`,
+    }).catch((error) => console.error('Create audio notification error:', error.message));
+
     return res.status(201).json(audio);
   } catch (err) {
     console.error('Error in createAudio:', err);

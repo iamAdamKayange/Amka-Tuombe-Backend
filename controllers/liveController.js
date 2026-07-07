@@ -1,10 +1,20 @@
 const LiveSession = require('../models/LiveSession');
+const Notification = require('../models/Notification');
 const youtubeService = require('../services/youtubeService');
 
 exports.getCurrentLive = async (req, res) => {
   try {
     const youtubeLive = await youtubeService.getCurrentLive();
     if (youtubeLive) {
+      await Notification.create({
+        type: 'live',
+        title: 'Live imeanza',
+        body: youtubeLive.title || 'Mwl. Ayubu Mwafyela yuko live sasa',
+        url: youtubeLive.streamUrl || youtubeLive.stream_url || youtubeLive.url || null,
+        mediaId: youtubeLive.videoId || youtubeLive.id || null,
+        dedupeKey: `live:${youtubeLive.videoId || youtubeLive.id || youtubeLive.title}`,
+      }).catch((error) => console.error('Create YouTube live notification error:', error.message));
+
       return res.json({
         isActive: true,
         source: 'youtube',
@@ -31,6 +41,15 @@ exports.startLive = async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     const { title, streamUrl } = req.body;
     const session = await LiveSession.create({ title, streamUrl });
+    await Notification.create({
+      type: 'live',
+      title: 'Live imeanza',
+      body: session.title || title || 'Matangazo ya live yameanza',
+      url: session.stream_url || streamUrl || null,
+      mediaId: session.id,
+      dedupeKey: `manual-live:${session.id}`,
+    }).catch((error) => console.error('Create manual live notification error:', error.message));
+
     res.status(201).json(session);
   } catch (err) {
     res.status(500).json({ error: err.message });
