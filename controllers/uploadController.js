@@ -25,6 +25,7 @@ exports.getUploadSignature = async (req, res) => {
       landscape: 'c_fill,g_auto,w_1280,h_720,q_auto:good',
       portrait: 'c_fill,g_auto,w_720,h_1280,q_auto:good',
       square: 'c_fill,g_auto,w_1080,h_1080,q_auto:good',
+      four_five: 'c_fill,g_auto,w_1080,h_1350,q_auto:good',
     };
     const cropPreset = Object.hasOwn(videoTransformations, req.query.crop)
       ? req.query.crop
