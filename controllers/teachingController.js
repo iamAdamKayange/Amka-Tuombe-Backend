@@ -2,6 +2,7 @@ const Teaching = require('../models/Teaching');
 const Comment = require('../models/Comment');
 const Like = require('../models/Like');
 const { validateTeaching } = require('../middleware/validate');
+const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
 
 exports.getAllTeachings = async (req, res) => {
   try {
@@ -175,5 +176,48 @@ exports.deleteComment = async (req, res) => {
     res.status(500).json({
       error: 'Failed to delete comment',
     });
+  }
+};
+
+exports.updateTeaching = async (req, res) => {
+  try {
+    const current = await Teaching.findById(req.params.id);
+    if (!current) return res.status(404).json({ error: 'Teaching not found' });
+
+    const title = req.body.title?.trim();
+    const description = req.body.description?.trim() ?? '';
+    if (!title || title.length < 3 || title.length > 100) {
+      return res.status(400).json({ error: 'Title must be 3 to 100 characters' });
+    }
+    if (description.length > 500) {
+      return res.status(400).json({ error: 'Description cannot exceed 500 characters' });
+    }
+
+    const teaching = await Teaching.update(req.params.id, {
+      title,
+      description,
+      thumbnail: req.body.thumbnail ?? current.thumbnail,
+      duration: req.body.duration ?? current.duration,
+    });
+    return res.json(teaching);
+  } catch (err) {
+    console.error('Update teaching error:', err);
+    return res.status(500).json({ error: 'Failed to update teaching' });
+  }
+};
+
+exports.deleteTeaching = async (req, res) => {
+  try {
+    const teaching = await Teaching.deleteById(req.params.id);
+    if (!teaching) return res.status(404).json({ error: 'Teaching not found' });
+
+    const publicId = teaching.cloudinary_public_id ||
+      extractCloudinaryPublicId(teaching.url || teaching.video_url);
+    if (publicId) await deleteFile(publicId);
+
+    return res.json({ message: 'Video deleted', id: teaching.id });
+  } catch (err) {
+    console.error('Delete teaching error:', err);
+    return res.status(500).json({ error: 'Failed to delete teaching' });
   }
 };

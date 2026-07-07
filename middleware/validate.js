@@ -7,6 +7,7 @@ const validateTeaching = (data) => {
     url: Joi.string().uri().required(),
     thumbnail: Joi.string().uri().optional(),
     duration: Joi.string().optional(),
+    cloudinaryPublicId: Joi.string().max(300).optional(),
   });
   return schema.validate(data);
 };

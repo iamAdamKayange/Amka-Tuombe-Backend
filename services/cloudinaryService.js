@@ -148,9 +148,34 @@ async function deleteFile(publicId, resourceType = 'video') {
   }
 }
 
+function extractCloudinaryPublicId(url) {
+  try {
+    const pathname = new URL(url).pathname;
+    const marker = pathname.includes('/video/upload/')
+      ? '/video/upload/'
+      : pathname.includes('/image/upload/')
+        ? '/image/upload/'
+        : null;
+    if (!marker) return null;
+    const uploadIndex = pathname.indexOf(marker);
+    if (uploadIndex < 0) return null;
+
+    const parts = pathname.slice(uploadIndex + marker.length).split('/');
+    const versionIndex = parts.findIndex((part) => /^v\d+$/.test(part));
+    const assetParts = versionIndex >= 0 ? parts.slice(versionIndex + 1) : parts;
+    if (assetParts.length === 0) return null;
+
+    const publicId = decodeURIComponent(assetParts.join('/')).replace(/\.[^.]+$/, '');
+    return publicId || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 module.exports = {
   uploadVideo,
   uploadAudio,
   deleteFile,
+  extractCloudinaryPublicId,
   buildVideoDelivery,
 };

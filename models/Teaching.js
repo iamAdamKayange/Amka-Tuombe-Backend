@@ -2,13 +2,13 @@ const pool = require('../config/db');
 
 class Teaching {
   // Create from YouTube URL
-  static async create({ title, description, url, thumbnail, duration, createdBy }) {
+  static async create({ title, description, url, thumbnail, duration, createdBy, cloudinaryPublicId }) {
     const query = `
-      INSERT INTO teachings (title, description, url, thumbnail, duration, created_by, status, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, 'completed', NOW())
+      INSERT INTO teachings (title, description, url, thumbnail, duration, created_by, cloudinary_public_id, status, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'completed', NOW())
       RETURNING *
     `;
-    const values = [title, description, url, thumbnail, duration, createdBy];
+    const values = [title, description, url, thumbnail, duration, createdBy, cloudinaryPublicId || null];
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
@@ -67,6 +67,37 @@ class Teaching {
 
   static async decrementLikes(id) {
     await pool.query('UPDATE teachings SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1', [id]);
+  }
+
+  static async update(id, { title, description, thumbnail, duration }) {
+    const { rows } = await pool.query(
+      `UPDATE teachings
+       SET title = $1, description = $2, thumbnail = $3, duration = $4
+       WHERE id = $5
+       RETURNING *`,
+      [title, description, thumbnail || null, duration || null, id],
+    );
+    return rows[0];
+  }
+
+  static async deleteById(id) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('DELETE FROM likes WHERE teaching_id = $1', [id]);
+      await client.query('DELETE FROM comments WHERE teaching_id = $1', [id]);
+      const { rows } = await client.query(
+        'DELETE FROM teachings WHERE id = $1 RETURNING *',
+        [id],
+      );
+      await client.query('COMMIT');
+      return rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
 

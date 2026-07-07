@@ -1,12 +1,28 @@
 const LiveSession = require('../models/LiveSession');
+const youtubeService = require('../services/youtubeService');
 
 exports.getCurrentLive = async (req, res) => {
   try {
+    const youtubeLive = await youtubeService.getCurrentLive();
+    if (youtubeLive) {
+      return res.json({
+        isActive: true,
+        source: 'youtube',
+        audioStreamUrl: process.env.LIVE_AUDIO_STREAM_URL || null,
+        live: youtubeLive,
+      });
+    }
+
     const live = await LiveSession.getActive();
     if (!live) return res.json({ isActive: false });
-    res.json({ isActive: true, live });
+    return res.json({
+      isActive: true,
+      source: 'manual',
+      audioStreamUrl: process.env.LIVE_AUDIO_STREAM_URL || null,
+      live,
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
 

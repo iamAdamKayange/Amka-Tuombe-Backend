@@ -1,13 +1,13 @@
 const pool = require('../config/db');
 
 class AudioSermon {
-  static async create({ title, description, audioUrl, duration, thumbnail, createdBy }) {
+  static async create({ title, description, audioUrl, duration, thumbnail, createdBy, cloudinaryPublicId }) {
     const query = `
-      INSERT INTO audio_sermons (title, description, audio_url, duration, thumbnail, created_by, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW())
+      INSERT INTO audio_sermons (title, description, audio_url, duration, thumbnail, created_by, cloudinary_public_id, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
       RETURNING *
     `;
-    const values = [title, description, audioUrl, duration, thumbnail, createdBy];
+    const values = [title, description, audioUrl, duration, thumbnail, createdBy, cloudinaryPublicId || null];
     const { rows } = await pool.query(query, values);
     return rows[0];
   }
@@ -37,6 +37,25 @@ class AudioSermon {
 
   static async incrementPlays(id) {
     await pool.query('UPDATE audio_sermons SET plays_count = plays_count + 1 WHERE id = $1', [id]);
+  }
+
+  static async update(id, { title, description, thumbnail, duration }) {
+    const { rows } = await pool.query(
+      `UPDATE audio_sermons
+       SET title = $1, description = $2, thumbnail = $3, duration = $4
+       WHERE id = $5
+       RETURNING *`,
+      [title, description, thumbnail || null, duration || null, id],
+    );
+    return rows[0];
+  }
+
+  static async deleteById(id) {
+    const { rows } = await pool.query(
+      'DELETE FROM audio_sermons WHERE id = $1 RETURNING *',
+      [id],
+    );
+    return rows[0];
   }
 }
 

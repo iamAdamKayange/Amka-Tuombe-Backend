@@ -4,6 +4,8 @@ const {
   getTeachingById,
   createTeaching,
   toggleLike,
+  updateTeaching,
+  deleteTeaching,
 } = require('../controllers/teachingController');
 const {
   addComment,
@@ -18,6 +20,8 @@ const router = express.Router();
 router.get('/', getAllTeachings);
 router.get('/:id', getTeachingById);
 router.post('/', auth, admin, createTeaching);
+router.patch('/:id', auth, admin, updateTeaching);
+router.delete('/:id', auth, admin, deleteTeaching);
 router.post('/:id/like', auth, toggleLike);
 
 // Comments routes (sasa zinatoka kwenye commentController)
