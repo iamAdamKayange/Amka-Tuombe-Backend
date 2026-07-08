@@ -5,7 +5,7 @@ class User {
     const query = `
       INSERT INTO users (email, password_hash, full_name, role)
       VALUES ($1, $2, $3, $4)
-      RETURNING id, email, full_name, role, created_at
+      RETURNING id, email, full_name, role, avatar_url, created_at
     `;
     const values = [email, passwordHash, fullName, role];
     const { rows } = await pool.query(query, values);
@@ -19,8 +19,30 @@ class User {
 
   static async findById(id) {
     const { rows } = await pool.query(
-      'SELECT id, email, full_name, role, created_at FROM users WHERE id = $1',
+      'SELECT id, email, full_name, role, avatar_url, created_at FROM users WHERE id = $1',
       [id] // id ni UUID string
+    );
+    return rows[0];
+  }
+
+  static async updateProfile(id, { email, fullName, avatarUrl }) {
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET email = COALESCE($1, email),
+           full_name = COALESCE($2, full_name),
+           avatar_url = COALESCE($3, avatar_url),
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, email, full_name, role, avatar_url, created_at`,
+      [email || null, fullName || null, avatarUrl || null, id],
+    );
+    return rows[0];
+  }
+
+  static async deleteById(id) {
+    const { rows } = await pool.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, email, full_name, role, avatar_url',
+      [id],
     );
     return rows[0];
   }

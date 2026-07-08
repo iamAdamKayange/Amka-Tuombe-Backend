@@ -6,7 +6,7 @@ const validateTeaching = (data) => {
     description: Joi.string().max(500).allow(''),
     url: Joi.string().uri().required(),
     thumbnail: Joi.string().uri().optional(),
-    duration: Joi.string().optional(),
+    duration: Joi.string().allow('').optional(),
     cloudinaryPublicId: Joi.string().max(300).optional(),
   });
   return schema.validate(data);
@@ -26,7 +26,7 @@ const validateAudio = (data) => {
     title: Joi.string().min(3).max(100).required(),
     description: Joi.string().max(500),
     audioUrl: Joi.string().uri().required(),
-    duration: Joi.string().optional(),
+    duration: Joi.string().allow('').optional(),
     thumbnail: Joi.string().uri().optional(),
   });
   return schema.validate(data);
