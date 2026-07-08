@@ -2,7 +2,7 @@ const AudioSermon = require('../models/AudioSermon');
 const Notification = require('../models/Notification');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
 const { uploadAudio, deleteObject, extractR2Key } = require('../services/r2Service');
-const { emitMediaChanged } = require('../services/realtimeService');
+const { emitMediaChanged, emitNotificationChanged } = require('../services/realtimeService');
 
 exports.getAllAudio = async (req, res) => {
   try {
@@ -64,7 +64,7 @@ exports.createAudio = async (req, res) => {
     };
 
     const audio = await AudioSermon.create(audioData);
-    await Notification.create({
+    const notification = await Notification.create({
       type: 'audio',
       title: 'Audio mpya imewekwa',
       body: audio.title,
@@ -73,6 +73,7 @@ exports.createAudio = async (req, res) => {
       dedupeKey: `audio:${audio.id}`,
     }).catch((error) => console.error('Create audio notification error:', error.message));
 
+    if (notification) emitNotificationChanged('created', notification);
     emitMediaChanged('created', 'audio', audio);
     return res.status(201).json(audio);
   } catch (err) {

@@ -1,12 +1,16 @@
 const LiveSession = require('../models/LiveSession');
 const Notification = require('../models/Notification');
+const {
+  emitLiveChanged,
+  emitNotificationChanged,
+} = require('../services/realtimeService');
 const youtubeService = require('../services/youtubeService');
 
 exports.getCurrentLive = async (req, res) => {
   try {
     const youtubeLive = await youtubeService.getCurrentLive();
     if (youtubeLive) {
-      await Notification.create({
+      const notification = await Notification.create({
         type: 'live',
         title: 'Live imeanza',
         body: youtubeLive.title || 'Mwl. Ayubu Mwafyela yuko live sasa',
@@ -14,6 +18,11 @@ exports.getCurrentLive = async (req, res) => {
         mediaId: youtubeLive.videoId || youtubeLive.id || null,
         dedupeKey: `live:${youtubeLive.videoId || youtubeLive.id || youtubeLive.title}`,
       }).catch((error) => console.error('Create YouTube live notification error:', error.message));
+
+      if (notification) {
+        emitNotificationChanged('created', notification);
+        emitLiveChanged('started', youtubeLive);
+      }
 
       return res.json({
         isActive: true,
@@ -41,7 +50,7 @@ exports.startLive = async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     const { title, streamUrl, streamUrlHd } = req.body;
     const session = await LiveSession.create({ title, streamUrl, streamUrlHd });
-    await Notification.create({
+    const notification = await Notification.create({
       type: 'live',
       title: 'Live imeanza',
       body: session.title || title || 'Matangazo ya live yameanza',
@@ -50,6 +59,8 @@ exports.startLive = async (req, res) => {
       dedupeKey: `manual-live:${session.id}`,
     }).catch((error) => console.error('Create manual live notification error:', error.message));
 
+    if (notification) emitNotificationChanged('created', notification);
+    emitLiveChanged('started', session);
     res.status(201).json(session);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -62,6 +73,7 @@ exports.endLive = async (req, res) => {
     const active = await LiveSession.getActive();
     if (!active) return res.status(404).json({ error: 'No active live session' });
     const ended = await LiveSession.endSession(active.id);
+    emitLiveChanged('ended', ended);
     res.json(ended);
   } catch (err) {
     res.status(500).json({ error: err.message });

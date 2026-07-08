@@ -5,7 +5,7 @@ const Notification = require('../models/Notification');
 const { validateTeaching } = require('../middleware/validate');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
 const { deleteObject, extractR2Key } = require('../services/r2Service');
-const { emitMediaChanged } = require('../services/realtimeService');
+const { emitMediaChanged, emitNotificationChanged } = require('../services/realtimeService');
 
 exports.getAllTeachings = async (req, res) => {
   try {
@@ -65,7 +65,7 @@ exports.createTeaching = async (req, res) => {
       createdBy: req.user.id,
     });
 
-    await Notification.create({
+    const notification = await Notification.create({
       type: 'video',
       title: 'Video mpya imewekwa',
       body: teaching.title,
@@ -74,6 +74,7 @@ exports.createTeaching = async (req, res) => {
       dedupeKey: `video:${teaching.id}`,
     }).catch((error) => console.error('Create video notification error:', error.message));
 
+    if (notification) emitNotificationChanged('created', notification);
     emitMediaChanged('created', 'video', teaching);
     res.status(201).json(teaching);
   } catch (err) {

@@ -20,7 +20,31 @@ function emitMediaChanged(action, mediaType, item) {
   });
 }
 
+function emitLiveChanged(action, item = null) {
+  if (!io) return;
+
+  io.emit('live:changed', {
+    action,
+    id: item?.id ?? null,
+    item,
+    at: new Date().toISOString(),
+  });
+}
+
+function emitNotificationChanged(action, item = null) {
+  if (!io) return;
+
+  io.emit('notification:changed', {
+    action,
+    id: item?.id ?? null,
+    item,
+    at: new Date().toISOString(),
+  });
+}
+
 module.exports = {
   initRealtime,
   emitMediaChanged,
+  emitLiveChanged,
+  emitNotificationChanged,
 };
