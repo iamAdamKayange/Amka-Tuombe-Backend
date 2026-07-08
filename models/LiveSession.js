@@ -1,13 +1,13 @@
 const pool = require('../config/db');
 
 class LiveSession {
-  static async create({ title, streamUrl }) {
+  static async create({ title, streamUrl, streamUrlHd }) {
     const query = `
-      INSERT INTO live_sessions (title, stream_url, is_active, started_at)
-      VALUES ($1, $2, true, NOW())
+      INSERT INTO live_sessions (title, stream_url, stream_url_hd, is_active, started_at)
+      VALUES ($1, $2, $3, true, NOW())
       RETURNING *
     `;
-    const values = [title, streamUrl];
+    const values = [title, streamUrl, streamUrlHd || null];
     const { rows } = await pool.query(query, values);
     return rows[0];
   }

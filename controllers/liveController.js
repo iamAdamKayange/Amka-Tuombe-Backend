@@ -39,8 +39,8 @@ exports.getCurrentLive = async (req, res) => {
 exports.startLive = async (req, res) => {
   try {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-    const { title, streamUrl } = req.body;
-    const session = await LiveSession.create({ title, streamUrl });
+    const { title, streamUrl, streamUrlHd } = req.body;
+    const session = await LiveSession.create({ title, streamUrl, streamUrlHd });
     await Notification.create({
       type: 'live',
       title: 'Live imeanza',
