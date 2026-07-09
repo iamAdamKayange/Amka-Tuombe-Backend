@@ -1,5 +1,24 @@
 const Notification = require('../models/Notification');
 const PushDeviceToken = require('../models/PushDeviceToken');
+const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
+
+async function optionalUser(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) return null;
+
+  try {
+    const token = authHeader.slice('Bearer '.length).trim();
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { rows } = await pool.query(
+      'SELECT id FROM users WHERE id = $1',
+      [decoded.userId],
+    );
+    return rows[0] || null;
+  } catch (_) {
+    return null;
+  }
+}
 
 exports.getNotifications = async (req, res) => {
   try {
@@ -20,10 +39,11 @@ exports.registerDeviceToken = async (req, res) => {
     if (!token) return res.status(400).json({ error: 'Device token required' });
 
     const platform = req.body.platform?.trim() || null;
+    const user = await optionalUser(req);
     const device = await PushDeviceToken.upsert({
       token,
       platform,
-      userId: null,
+      userId: user?.id || null,
     });
 
     return res.status(201).json({ ok: true, id: device.id });

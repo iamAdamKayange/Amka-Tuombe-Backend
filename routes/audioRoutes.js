@@ -16,7 +16,16 @@ router.get('/', getAllAudio);
 router.get('/:id', getAudioById);
 
 // Admin route for file upload (multipart/form-data)
-router.post('/upload', auth, admin, upload.single('audio'), createAudio);
+router.post(
+  '/upload',
+  auth,
+  admin,
+  upload.fields([
+    { name: 'audio', maxCount: 1 },
+    { name: 'cover', maxCount: 1 },
+  ]),
+  createAudio,
+);
 router.patch('/:id', auth, admin, updateAudio);
 router.delete('/:id', auth, admin, deleteAudio);
 

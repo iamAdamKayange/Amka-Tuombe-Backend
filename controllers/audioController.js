@@ -1,7 +1,7 @@
 const AudioSermon = require('../models/AudioSermon');
 const Notification = require('../models/Notification');
 const { deleteFile, extractCloudinaryPublicId } = require('../services/cloudinaryService');
-const { uploadAudio, deleteObject, extractR2Key } = require('../services/r2Service');
+const { uploadAudio, uploadImage, deleteObject, extractR2Key } = require('../services/r2Service');
 const { emitMediaChanged, emitNotificationChanged } = require('../services/realtimeService');
 
 exports.getAllAudio = async (req, res) => {
@@ -31,7 +31,10 @@ exports.getAudioById = async (req, res) => {
 
 exports.createAudio = async (req, res) => {
   try {
-    if (!req.file) {
+    const audioFile = req.file || req.files?.audio?.[0];
+    const coverFile = req.files?.cover?.[0] || null;
+
+    if (!audioFile) {
       return res.status(400).json({ error: 'Audio file required' });
     }
 
@@ -45,20 +48,30 @@ exports.createAudio = async (req, res) => {
 
     console.log('Uploading audio to Cloudflare R2...');
 
-    const result = await uploadAudio(req.file.path, {
+    const result = await uploadAudio(audioFile.path, {
       title: req.body.title.trim(),
-      originalName: req.file.originalname,
-      contentType: req.file.mimetype,
+      originalName: audioFile.originalname,
+      contentType: audioFile.mimetype,
     });
+    const coverResult = coverFile
+      ? await uploadImage(coverFile.path, {
+          title: `${req.body.title.trim()} cover`,
+          originalName: coverFile.originalname,
+          contentType: coverFile.mimetype,
+        })
+      : null;
     const audioUrl =
       `${req.protocol}://${req.get('host')}/api/media/r2/${encodeURI(result.key)}`;
+    const coverUrl = coverResult
+      ? `${req.protocol}://${req.get('host')}/api/media/r2/${encodeURI(coverResult.key)}`
+      : null;
 
     const audioData = {
       title: req.body.title.trim(),
       description: req.body.description ? req.body.description.trim() : '',
       audioUrl,
       duration: req.body.duration || '',
-      thumbnail: req.body.thumbnail || null,
+      thumbnail: coverUrl || req.body.thumbnail || null,
       createdBy: req.user.id,
       cloudinaryPublicId: result.key,
     };
@@ -123,8 +136,13 @@ exports.deleteAudio = async (req, res) => {
       if (publicId) await deleteFile(publicId);
     }
 
-    const coverPublicId = extractCloudinaryPublicId(audio.thumbnail);
-    if (coverPublicId) await deleteFile(coverPublicId, 'image');
+    const coverR2Key = extractR2Key(audio.thumbnail);
+    if (coverR2Key) {
+      await deleteObject(coverR2Key);
+    } else {
+      const coverPublicId = extractCloudinaryPublicId(audio.thumbnail);
+      if (coverPublicId) await deleteFile(coverPublicId, 'image');
+    }
 
     emitMediaChanged('deleted', 'audio', { id: audio.id });
     return res.json({ message: 'Audio deleted', id: audio.id });

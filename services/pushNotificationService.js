@@ -45,6 +45,17 @@ async function sendPushToAll(notification) {
   if (!notification || !initializeFirebaseAdmin()) return;
 
   const tokens = await PushDeviceToken.findActiveTokens();
+  await sendPushToTokens(tokens, notification);
+}
+
+async function sendPushToAdmins(notification) {
+  if (!notification || !initializeFirebaseAdmin()) return;
+
+  const tokens = await PushDeviceToken.findActiveAdminTokens();
+  await sendPushToTokens(tokens, notification);
+}
+
+async function sendPushToTokens(tokens, notification) {
   if (tokens.length === 0) return;
 
   const message = {
@@ -96,4 +107,5 @@ async function sendPushToAll(notification) {
 
 module.exports = {
   sendPushToAll,
+  sendPushToAdmins,
 };

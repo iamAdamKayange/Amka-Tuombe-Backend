@@ -42,9 +42,21 @@ function emitNotificationChanged(action, item = null) {
   });
 }
 
+function emitPrayerChanged(action, item = null) {
+  if (!io) return;
+
+  io.emit('prayer:changed', {
+    action,
+    id: item?.id ?? null,
+    item,
+    at: new Date().toISOString(),
+  });
+}
+
 module.exports = {
   initRealtime,
   emitMediaChanged,
   emitLiveChanged,
   emitNotificationChanged,
+  emitPrayerChanged,
 };
