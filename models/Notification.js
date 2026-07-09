@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { sendPushToAll } = require('../services/pushNotificationService');
 
 class Notification {
   static async create({ type, title, body = '', url = null, mediaId = null, dedupeKey }) {
@@ -10,7 +11,13 @@ class Notification {
        RETURNING *`,
       [type, title, body, url, mediaId, key],
     );
-    return rows[0] || null;
+    const notification = rows[0] || null;
+    if (notification) {
+      sendPushToAll(notification).catch((error) => {
+        console.error('Push notification error:', error.message);
+      });
+    }
+    return notification;
   }
 
   static async findRecent({ since = null, limit = 50 }) {
