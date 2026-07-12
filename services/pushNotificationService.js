@@ -1,4 +1,10 @@
-const admin = require('firebase-admin');
+const {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+} = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 const PushDeviceToken = require('../models/PushDeviceToken');
 
 let initialized = false;
@@ -8,23 +14,23 @@ function initializeFirebaseAdmin() {
   if (initialized || unavailableReason) return initialized;
 
   try {
-    if (admin.apps.length > 0) {
+    if (getApps().length > 0) {
       initialized = true;
       return true;
     }
 
     const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     if (serviceAccountJson) {
-      admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(serviceAccountJson)),
+      initializeApp({
+        credential: cert(JSON.parse(serviceAccountJson)),
       });
       initialized = true;
       return true;
     }
 
     if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
+      initializeApp({
+        credential: applicationDefault(),
       });
       initialized = true;
       return true;
@@ -87,7 +93,7 @@ async function sendPushToTokens(tokens, notification) {
     },
   };
 
-  const response = await admin.messaging().sendEachForMulticast(message);
+  const response = await getMessaging().sendEachForMulticast(message);
   const invalidTokens = [];
   response.responses.forEach((result, index) => {
     if (!result.success) {
