@@ -10,6 +10,20 @@ const PushDeviceToken = require('../models/PushDeviceToken');
 let initialized = false;
 let unavailableReason = null;
 
+function serviceAccountFromEnv() {
+  const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  if (base64) {
+    return JSON.parse(Buffer.from(base64, 'base64').toString('utf8'));
+  }
+
+  const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (json) {
+    return JSON.parse(json);
+  }
+
+  return null;
+}
+
 function initializeFirebaseAdmin() {
   if (initialized || unavailableReason) return initialized;
 
@@ -19,10 +33,10 @@ function initializeFirebaseAdmin() {
       return true;
     }
 
-    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (serviceAccountJson) {
+    const serviceAccount = serviceAccountFromEnv();
+    if (serviceAccount) {
       initializeApp({
-        credential: cert(JSON.parse(serviceAccountJson)),
+        credential: cert(serviceAccount),
       });
       initialized = true;
       return true;
@@ -37,13 +51,28 @@ function initializeFirebaseAdmin() {
     }
 
     unavailableReason =
-      'Firebase Admin credentials missing. Set FIREBASE_SERVICE_ACCOUNT_JSON on Render.';
+      'Firebase Admin credentials missing. Set FIREBASE_SERVICE_ACCOUNT_BASE64 or FIREBASE_SERVICE_ACCOUNT_JSON on Render.';
     console.warn(unavailableReason);
     return false;
   } catch (error) {
     unavailableReason = `Firebase Admin init failed: ${error.message}`;
     console.error(unavailableReason);
     return false;
+  }
+}
+
+function androidChannelFor(type) {
+  switch (type) {
+    case 'live':
+      return 'live_updates';
+    case 'video':
+      return 'video_updates';
+    case 'audio':
+      return 'audio_updates';
+    case 'prayer':
+      return 'prayer_updates';
+    default:
+      return 'daily_prayer';
   }
 }
 
@@ -64,8 +93,11 @@ async function sendPushToAdmins(notification) {
 async function sendPushToTokens(tokens, notification) {
   if (tokens.length === 0) return;
 
+  const cleanTokens = [...new Set(tokens.filter(Boolean))];
+  if (cleanTokens.length === 0) return;
+
   const message = {
-    tokens,
+    tokens: cleanTokens,
     notification: {
       title: notification.title || 'AmkaTuombe TV',
       body: notification.body || '',
@@ -79,7 +111,7 @@ async function sendPushToTokens(tokens, notification) {
     android: {
       priority: 'high',
       notification: {
-        channelId: `${notification.type || 'general'}_updates`,
+        channelId: androidChannelFor(notification.type),
         sound: 'default',
       },
     },
@@ -102,7 +134,7 @@ async function sendPushToTokens(tokens, notification) {
         code === 'messaging/registration-token-not-registered' ||
         code === 'messaging/invalid-registration-token'
       ) {
-        invalidTokens.push(tokens[index]);
+        invalidTokens.push(cleanTokens[index]);
       }
       console.error('FCM send error:', code || result.error?.message);
     }

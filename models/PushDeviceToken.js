@@ -1,18 +1,40 @@
 const pool = require('../config/db');
 
+function normalizeDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 class PushDeviceToken {
-  static async upsert({ token, platform = null, userId = null }) {
+  static async upsert({
+    token,
+    platform = null,
+    userId = null,
+    installCutoffAt = null,
+  }) {
     const { rows } = await pool.query(
-      `INSERT INTO push_device_tokens (token, platform, user_id, is_active, last_seen_at)
-       VALUES ($1, $2, $3, true, NOW())
+      `INSERT INTO push_device_tokens (
+         token,
+         platform,
+         user_id,
+         install_cutoff_at,
+         is_active,
+         last_seen_at
+       )
+       VALUES ($1, $2, $3, $4, true, NOW())
        ON CONFLICT (token)
        DO UPDATE SET
          platform = COALESCE(EXCLUDED.platform, push_device_tokens.platform),
          user_id = EXCLUDED.user_id,
+         install_cutoff_at = COALESCE(
+           EXCLUDED.install_cutoff_at,
+           push_device_tokens.install_cutoff_at
+         ),
          is_active = true,
          last_seen_at = NOW()
        RETURNING *`,
-      [token, platform, userId],
+      [token, platform, userId, normalizeDate(installCutoffAt)],
     );
     return rows[0];
   }

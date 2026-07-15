@@ -39,10 +39,12 @@ exports.registerDeviceToken = async (req, res) => {
     if (!token) return res.status(400).json({ error: 'Device token required' });
 
     const platform = req.body.platform?.trim() || null;
+    const installCutoffAt = req.body.installCutoffAt || null;
     const user = await optionalUser(req);
     const device = await PushDeviceToken.upsert({
       token,
       platform,
+      installCutoffAt,
       userId: user?.id || null,
     });
 
