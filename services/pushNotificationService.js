@@ -9,6 +9,7 @@ const PushDeviceToken = require('../models/PushDeviceToken');
 
 let initialized = false;
 let unavailableReason = null;
+let firebaseProjectId = null;
 
 function serviceAccountFromEnv() {
   const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
@@ -38,6 +39,10 @@ function initializeFirebaseAdmin() {
       initializeApp({
         credential: cert(serviceAccount),
       });
+      firebaseProjectId = serviceAccount.project_id || null;
+      if (firebaseProjectId) {
+        console.log(`Firebase Admin initialized for project ${firebaseProjectId}`);
+      }
       initialized = true;
       return true;
     }
@@ -132,7 +137,9 @@ async function sendPushToTokens(tokens, notification) {
       const code = result.error?.code || '';
       if (
         code === 'messaging/registration-token-not-registered' ||
-        code === 'messaging/invalid-registration-token'
+        code === 'messaging/invalid-registration-token' ||
+        code === 'messaging/mismatched-credential' ||
+        code === 'messaging/sender-id-mismatch'
       ) {
         invalidTokens.push(cleanTokens[index]);
       }
@@ -141,6 +148,14 @@ async function sendPushToTokens(tokens, notification) {
   });
 
   await PushDeviceToken.deactivate(invalidTokens);
+  if (invalidTokens.length > 0) {
+    console.warn(`Deactivated ${invalidTokens.length} invalid FCM token(s).`);
+  }
+  console.log(
+    `Push sent for notification ${notification.id || notification.type}: ` +
+      `${response.successCount} success, ${response.failureCount} failed, ` +
+      `${cleanTokens.length} target(s).`,
+  );
 }
 
 module.exports = {
