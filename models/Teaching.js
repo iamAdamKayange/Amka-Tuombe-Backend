@@ -69,6 +69,9 @@ class Teaching {
     await pool.query('UPDATE teachings SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = $1', [id]);
   }
 
+  static async incrementDownloads(id) {
+    await pool.query('UPDATE teachings SET downloads_count = COALESCE(downloads_count, 0) + 1 WHERE id = $1', [id]);
+  }
   static async update(id, { title, description, thumbnail, duration }) {
     const { rows } = await pool.query(
       `UPDATE teachings
@@ -102,3 +105,4 @@ class Teaching {
 }
 
 module.exports = Teaching;
+

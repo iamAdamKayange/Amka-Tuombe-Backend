@@ -50,6 +50,30 @@ exports.getTeachingById = async (req, res) => {
   }
 };
 
+exports.getTeachingDownload = async (req, res) => {
+  try {
+    const teaching = await Teaching.findById(req.params.id);
+    if (!teaching) return res.status(404).json({ error: 'Teaching not found' });
+
+    const url = teaching.video_url || teaching.url;
+    if (!url) return res.status(404).json({ error: 'Video URL not found' });
+
+    await Teaching.incrementDownloads(req.params.id).catch((error) => {
+      console.error('Download count error:', error.message);
+    });
+
+    return res.json({
+      id: teaching.id,
+      title: teaching.title,
+      url,
+      thumbnail: teaching.thumbnail,
+      duration: teaching.duration,
+    });
+  } catch (err) {
+    console.error('getTeachingDownload error:', err);
+    return res.status(500).json({ error: 'Failed to prepare download' });
+  }
+};
 exports.createTeaching = async (req, res) => {
   try {
     const { error } = validateTeaching(req.body);
@@ -243,3 +267,4 @@ exports.deleteTeaching = async (req, res) => {
     return res.status(500).json({ error: 'Failed to delete teaching' });
   }
 };
+

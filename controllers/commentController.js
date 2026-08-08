@@ -56,7 +56,8 @@ exports.getCommentsByTeaching = async (req, res) => {
     const comments = await Comment.findByTeachingId(
       teachingId,
       page,
-      limit
+      limit,
+      req.query.sort || 'newest'
     );
 
     res.json(comments);
@@ -180,5 +181,71 @@ exports.updateComment = async (req, res) => {
     res.status(500).json({
       error: 'Imeshindwa kubadilisha maoni',
     });
+  }
+};
+exports.replyToComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { content } = req.body;
+
+    if (!content || content.trim() === '') {
+      return res.status(400).json({ error: 'Reply inahitajika' });
+    }
+
+    if (content.length > 500) {
+      return res.status(400).json({ error: 'Reply haiwezi kuzidi herufi 500' });
+    }
+
+    const parent = await Comment.findById(commentId);
+    if (!parent) return res.status(404).json({ error: 'Comment haipatikani' });
+
+    const reply = await Comment.create({
+      teachingId: parent.teaching_id,
+      userId: req.user.id,
+      content: content.trim(),
+      parentId: commentId,
+    });
+
+    const fullReply = await Comment.findById(reply.id);
+    return res.status(201).json(fullReply || reply);
+  } catch (err) {
+    console.error('Error in replyToComment:', err);
+    return res.status(500).json({ error: 'Imeshindwa kuongeza reply' });
+  }
+};
+
+exports.toggleCommentLike = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const comment = await Comment.findById(commentId);
+    if (!comment) return res.status(404).json({ error: 'Comment haipatikani' });
+
+    const liked = await Comment.toggleLike(commentId, req.user.id);
+    return res.json({ liked });
+  } catch (err) {
+    console.error('Error in toggleCommentLike:', err);
+    return res.status(500).json({ error: 'Imeshindwa kulike comment' });
+  }
+};
+
+exports.pinComment = async (req, res) => {
+  try {
+    const updated = await Comment.setPinned(req.params.commentId, true);
+    if (!updated) return res.status(404).json({ error: 'Comment haipatikani' });
+    return res.json(await Comment.findById(req.params.commentId));
+  } catch (err) {
+    console.error('Error in pinComment:', err);
+    return res.status(500).json({ error: 'Imeshindwa kupin comment' });
+  }
+};
+
+exports.unpinComment = async (req, res) => {
+  try {
+    const updated = await Comment.setPinned(req.params.commentId, false);
+    if (!updated) return res.status(404).json({ error: 'Comment haipatikani' });
+    return res.json(await Comment.findById(req.params.commentId));
+  } catch (err) {
+    console.error('Error in unpinComment:', err);
+    return res.status(500).json({ error: 'Imeshindwa ku-unpin comment' });
   }
 };
